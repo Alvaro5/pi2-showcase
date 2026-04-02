@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Causal Approach to Bitcoin Performance Modeling — Project 027</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e17;
+    --bg2: #111827;
+    --bg3: #1a2035;
+    --surface: #1e293b;
+    --border: #2a3a52;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --accent: #3b82f6;
+    --accent2: #6366f1;
+    --onchain: #10b981;
+    --macro: #f59e0b;
+    --sentiment: #ec4899;
+    --crypto: #8b5cf6;
+    --btc: #f97316;
+    --danger: #ef4444;
+    --success: #22c55e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(10,14,23,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  nav .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700; font-size: 0.85rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  nav .logo span { color: var(--btc); }
+  nav ul { list-style: none; display: flex; gap: 0.25rem; }
+  nav ul li a {
+    color: var(--text2); text-decoration: none; font-size: 0.8rem;
+    padding: 0.4rem 0.75rem; border-radius: 6px; transition: all 0.2s;
+    font-weight: 500;
+  }
+  nav ul li a:hover, nav ul li a.active { color: var(--text); background: var(--surface); }
+
+  @media (max-width: 900px) {
+    nav ul { display: none; }
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 6rem 2rem 4rem;
+    position: relative;
+    background: radial-gradient(ellipse at 50% 30%, rgba(59,130,246,0.08), transparent 60%),
+                radial-gradient(ellipse at 80% 60%, rgba(249,115,22,0.06), transparent 50%);
+  }
+  .hero-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; color: var(--accent); letter-spacing: 0.1em;
+    text-transform: uppercase; margin-bottom: 1.5rem;
+    padding: 0.4rem 1rem; border: 1px solid rgba(59,130,246,0.3);
+    border-radius: 50px;
+  }
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.2rem, 5vw, 4rem); font-weight: 700;
+    line-height: 1.15; max-width: 850px; margin-bottom: 1.5rem;
+  }
+  .hero h1 .highlight {
+    background: linear-gradient(135deg, var(--btc), var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    color: var(--text2); font-size: 1.1rem; max-width: 620px;
+    margin-bottom: 2.5rem; line-height: 1.8;
+  }
+  .hero-stats {
+    display: flex; gap: 3rem; flex-wrap: wrap; justify-content: center;
+  }
+  .hero-stat {
+    text-align: center;
+  }
+  .hero-stat .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.5rem; font-weight: 700; color: var(--accent);
+    display: block; line-height: 1;
+  }
+  .hero-stat .label { font-size: 0.82rem; color: var(--text3); margin-top: 0.3rem; }
+
+  /* ── SECTIONS ── */
+  section {
+    max-width: 1100px; margin: 0 auto;
+    padding: 5rem 2rem;
+  }
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 0.5rem;
+  }
+  section h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700;
+    margin-bottom: 1rem; line-height: 1.25;
+  }
+  section .subtitle {
+    color: var(--text2); font-size: 1rem; max-width: 700px;
+    margin-bottom: 2.5rem;
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.75rem;
+    transition: border-color 0.3s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card h3 {
+    font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;
+  }
+  .card p { color: var(--text2); font-size: 0.9rem; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; }
+
+  @media (max-width: 800px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* ── PILLAR CARDS ── */
+  .pillar-card {
+    background: var(--bg2); border-radius: 12px; padding: 1.5rem;
+    border-left: 4px solid;
+  }
+  .pillar-card.onchain { border-color: var(--onchain); }
+  .pillar-card.macro { border-color: var(--macro); }
+  .pillar-card.sentiment { border-color: var(--sentiment); }
+  .pillar-card.crypto { border-color: var(--crypto); }
+  .pillar-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .pillar-card .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; color: var(--text3); margin-bottom: 0.75rem;
+  }
+  .pillar-card .features {
+    display: flex; flex-wrap: wrap; gap: 0.4rem;
+  }
+  .pillar-card .features span {
+    font-size: 0.75rem; padding: 0.2rem 0.5rem;
+    background: rgba(255,255,255,0.05); border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; color: var(--text2);
+  }
+
+  /* ── METHOD CARDS ── */
+  .method-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.5rem;
+  }
+  .method-card h3 {
+    font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .method-card .tag {
+    font-size: 0.65rem; padding: 0.15rem 0.4rem;
+    border-radius: 4px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .method-card .formula {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem; color: var(--accent);
+    background: rgba(59,130,246,0.08); padding: 0.5rem 0.75rem;
+    border-radius: 6px; margin: 0.75rem 0;
+    border: 1px solid rgba(59,130,246,0.15);
+  }
+  .method-card .result {
+    font-size: 0.82rem; color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 0.5rem;
+  }
+
+  /* ── DAG ── */
+  .dag-container {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 2rem;
+    margin: 2rem 0;
+    overflow-x: auto;
+  }
+  .dag-container svg { width: 100%; height: auto; }
+
+  /* ── TABLES ── */
+  .data-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  .data-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text3); padding: 0.75rem 1rem; text-align: left;
+    border-bottom: 2px solid var(--border);
+    font-weight: 600;
+  }
+  .data-table td {
+    padding: 0.75rem 1rem; border-bottom: 1px solid rgba(42,58,82,0.5);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  }
+  .data-table tr:hover td { background: rgba(59,130,246,0.04); }
+  .val-high { color: var(--success); font-weight: 700; }
+  .val-low { color: var(--danger); font-weight: 700; }
+  .val-mid { color: var(--macro); }
+
+  /* ── HEATMAP ── */
+  .heatmap-grid {
+    display: grid; grid-template-columns: 100px repeat(4, 1fr);
+    gap: 2px; margin: 1.5rem 0;
+  }
+  .heatmap-cell {
+    padding: 1rem 0.5rem; text-align: center; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;
+    font-weight: 600; transition: transform 0.2s;
+  }
+  .heatmap-cell:hover { transform: scale(1.05); }
+  .heatmap-header {
+    font-size: 0.72rem; color: var(--text3); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .heatmap-row-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem; font-weight: 700; color: var(--text);
+    display: flex; align-items: center;
+  }
+
+  /* ── BAR CHART ── */
+  .bar-chart {
+    display: flex; gap: 1.5rem; align-items: flex-end;
+    justify-content: center; padding: 2rem 0;
+    flex-wrap: wrap;
+  }
+  .bar-group {
+    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  }
+  .bar-pair {
+    display: flex; gap: 4px; align-items: flex-end; height: 180px;
+  }
+  .bar {
+    width: 32px; border-radius: 4px 4px 0 0;
+    position: relative; transition: all 0.3s;
+    display: flex; align-items: flex-start; justify-content: center;
+  }
+  .bar:hover { filter: brightness(1.2); }
+  .bar .bar-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; font-weight: 700; color: var(--text);
+    position: absolute; top: -20px; white-space: nowrap;
+  }
+  .bar.b14 { background: var(--accent); }
+  .bar.b30 { background: var(--btc); }
+  .bar-label { font-size: 0.72rem; color: var(--text2); text-align: center; max-width: 80px; }
+
+  /* ── KEY FINDING ── */
+  .key-finding {
+    background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(249,115,22,0.08));
+    border: 1px solid rgba(59,130,246,0.25);
+    border-radius: 12px; padding: 1.5rem 2rem;
+    margin: 2rem 0; text-align: center;
+    font-size: 1.1rem; font-weight: 500;
+  }
+  .key-finding strong { color: var(--btc); }
+
+  /* ── CONCLUSION ITEMS ── */
+  .conclusion-item {
+    padding: 1.25rem 1.5rem;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 0.75rem;
+    display: flex; gap: 1rem; align-items: flex-start;
+  }
+  .conclusion-item .marker {
+    color: var(--accent); font-size: 1.2rem; flex-shrink: 0; margin-top: 0.1rem;
+  }
+
+  /* ── PIPELINE ── */
+  .pipeline {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0; flex-wrap: wrap; margin: 2rem 0;
+  }
+  .pipeline-step {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem;
+    text-align: center; min-width: 180px;
+    position: relative;
+  }
+  .pipeline-step .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; color: var(--accent); font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+  .pipeline-step h4 { font-size: 0.88rem; margin-bottom: 0.25rem; }
+  .pipeline-step p { font-size: 0.75rem; color: var(--text3); }
+  .pipeline-arrow {
+    color: var(--text3); font-size: 1.5rem; padding: 0 0.5rem;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center; padding: 3rem 2rem;
+    border-top: 1px solid var(--border);
+    color: var(--text3); font-size: 0.82rem;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  /* ── SEPARATOR ── */
+  .sep {
+    height: 1px; background: var(--border); margin: 0 auto;
+    max-width: 200px;
+  }
+
+  /* ── CONSENSUS TABLE ── */
+  .consensus-table {
+    width: 100%; border-collapse: collapse; margin: 1.5rem 0;
+    font-size: 0.82rem;
+  }
+  .consensus-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; padding: 0.6rem 0.5rem;
+    text-align: center; color: var(--text3);
+    border-bottom: 2px solid var(--border);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .consensus-table td {
+    padding: 0.55rem 0.5rem; text-align: center;
+    border-bottom: 1px solid rgba(42,58,82,0.4);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+  }
+  .consensus-table .check { color: var(--success); }
+  .consensus-table .cross { color: var(--text3); opacity: 0.4; }
+  .consensus-table .feature-name { text-align: left; font-weight: 600; color: var(--text); }
+  .pill {
+    display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem;
+    border-radius: 4px; font-weight: 600;
+  }
+  .pill.onchain { background: rgba(16,185,129,0.15); color: var(--onchain); }
+  .pill.crypto { background: rgba(139,92,246,0.15); color: var(--crypto); }
+  .pill.sentiment { background: rgba(236,72,153,0.15); color: var(--sentiment); }
+
+  /* ── SCROLL ANIMATIONS ── */
+  .fade-in {
+    opacity: 0; transform: translateY(30px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .fade-in.visible { opacity: 1; transform: none; }
+
+  /* ── FRAMEWORK ── */
+  .framework-steps {
+    display: flex; flex-direction: column; gap: 0; align-items: center; margin: 2rem 0;
+  }
+  .fw-step {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.25rem 2rem;
+    width: 100%; max-width: 500px; display: flex; align-items: center; gap: 1rem;
+  }
+  .fw-step .fw-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5rem; font-weight: 700; color: var(--accent);
+    flex-shrink: 0;
+  }
+  .fw-arrow {
+    font-size: 1.5rem; color: var(--text3);
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">PI² <span>027</span></div>
+  <ul>
+    <li><a href="#context">Context</a></li>
+    <li><a href="#methodology">Method</a></li>
+    <li><a href="#data">Data</a></li>
+    <li><a href="#algorithms">Algorithms</a></li>
+    <li><a href="#dag">DAG</a></li>
+    <li><a href="#horizon">Horizon</a></li>
+    <li><a href="#prediction">Prediction</a></li>
+    <li><a href="#regimes">Regimes</a></li>
+    <li><a href="#conclusions">Results</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">Pi² Industrial Innovation Project · ESILV × Ginjer-AM</div>
+  <h1>A <span class="highlight">Causal Approach</span> to Bitcoin Performance Modeling</h1>
+  <p>Applying López de Prado's Causal Factor Investing Framework to identify the genuine causal determinants of Bitcoin price behavior across investment horizons.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><span class="num">34</span><span class="label">Features Tested</span></div>
+    <div class="hero-stat"><span class="num" style="color:var(--success)">10</span><span class="label">Causal Drivers Validated</span></div>
+    <div class="hero-stat"><span class="num" style="color:var(--danger)">0</span><span class="label">Macro Survivors</span></div>
+    <div class="hero-stat"><span class="num" style="color:var(--btc)">4</span><span class="label">Discovery Algorithms</span></div>
+  </div>
+</div>
+
+<!-- 1. CONTEXT -->
+<section id="context" class="fade-in">
+  <div class="section-label">01 — Context</div>
+  <h2>Research Question</h2>
+  <p class="subtitle">Bitcoin has attracted significant institutional interest, yet a fundamental question remains unresolved.</p>
+  
+  <div class="grid-2">
+    <div class="card">
+      <h3>🔗 The Problem</h3>
+      <p>Traditional correlation-based analysis is unreliable: correlations between Bitcoin and other assets are unstable over time and highly sensitive to the investment horizon and macro-financial context. Should Bitcoin be in a core portfolio for diversification, or confined to a satellite allocation?</p>
+    </div>
+    <div class="card">
+      <h3>🎯 Our Approach</h3>
+      <p>We shift from associational analysis toward <strong>causal inference</strong>, applying Marcos López de Prado's 3-step framework — the same methodology used at ADIA Lab (Abu Dhabi's sovereign wealth fund). This lets us separate genuine causes from spurious correlations.</p>
+    </div>
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 2. METHODOLOGY -->
+<section id="methodology" class="fade-in">
+  <div class="section-label">02 — Methodology</div>
+  <h2>López de Prado's 3-Step Framework</h2>
+  <p class="subtitle">Most finance papers stop at Step 1 (correlation). We go all the way to Step 3 (falsification).</p>
+
+  <div class="pipeline">
+    <div class="pipeline-step">
+      <div class="step-num">STEP 1</div>
+      <h4>Phenomenological</h4>
+      <p>Observe statistical associations across 34 features and 4 pillars. ADF + KPSS stationarity tests. Correlation heatmap reveals unstable associations.</p>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step">
+      <div class="step-num">STEP 2</div>
+      <h4>Theoretical</h4>
+      <p>Propose causal structures using 4 complementary algorithms. Consensus rule: feature detected by ≥ 2/4 methods qualifies as causal candidate.</p>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step">
+      <div class="step-num">STEP 3</div>
+      <h4>Falsification</h4>
+      <p>Test causal claims via DoWhy: placebo treatment, random common cause, data subset refutation. Only robust features retained → sparse, validated DAG.</p>
+    </div>
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 3. DATA -->
+<section id="data" class="fade-in">
+  <div class="section-label">03 — Data Architecture</div>
+  <h2>Four-Pillar Feature Organization</h2>
+  <p class="subtitle">34 features from Bloomberg and CoinMetrics (2015–2025), organized into four thematic families.</p>
+
+  <div class="grid-4">
+    <div class="pillar-card onchain">
+      <h3 style="color:var(--onchain)">On-Chain</h3>
+      <div class="count">9 features</div>
+      <div class="features">
+        <span>CapMVRV</span><span>HashRate</span><span>Mining Diff.</span><span>Miner Rev.</span><span>TxCnt</span><span>AdrActCnt</span><span>TX Volume</span><span>NVT</span><span>SplyCur</span>
+      </div>
+    </div>
+    <div class="pillar-card macro">
+      <h3 style="color:var(--macro)">Macro</h3>
+      <div class="count">12 features</div>
+      <div class="features">
+        <span>DXY</span><span>VIX</span><span>MOVE</span><span>SPX</span><span>CCMP</span><span>RTY</span><span>US 3M</span><span>Gold</span><span>Oil</span><span>M2</span><span>FARBAST</span><span>2Y10</span>
+      </div>
+    </div>
+    <div class="pillar-card sentiment">
+      <h3 style="color:var(--sentiment)">Sentiment</h3>
+      <div class="count">5+ features</div>
+      <div class="features">
+        <span>Fear & Greed</span><span>Stablecoin MCap</span><span>Exchange Bal.</span><span>Google "Bitcoin"</span><span>Google "Coinbase"</span>
+      </div>
+    </div>
+    <div class="pillar-card crypto">
+      <h3 style="color:var(--crypto)">Crypto Market</h3>
+      <div class="count">5 features</div>
+      <div class="features">
+        <span>ETH</span><span>BNB</span><span>XRP</span><span>LTC</span><span>CFTC Futures</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:1.5rem; color:var(--text3); font-size:0.85rem; text-align:center">
+    <strong>Preprocessing:</strong> log-returns for prices, first-differences for bounded ratios · forward-fill only (no look-ahead bias) · exclusion of BTC-derived features · weekly resampling for Google Trends compatibility
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 4. ALGORITHMS -->
+<section id="algorithms" class="fade-in">
+  <div class="section-label">04 — Discovery Algorithms</div>
+  <h2>Robustness via Multi-Method Consensus</h2>
+  <p class="subtitle">Four independent algorithms with different assumptions, applied to the same weekly-resampled dataset.</p>
+
+  <div class="grid-2">
+    <div class="method-card">
+      <h3>PC Algorithm <span class="tag" style="background:rgba(16,185,129,0.15);color:var(--onchain)">Constraint-based</span></h3>
+      <p style="color:var(--text2);font-size:0.85rem">Tests conditional independence via Fisher-Z on partial correlations. Removes edges that are conditionally independent. Contemporaneous structure only.</p>
+      <div class="formula">X ⊥⊥ Y | Z ⟹ remove edge</div>
+      <div class="result">α=0.05 · <span style="color:var(--success)">4 causes → BTC</span> (ETH, BNB, CapMVRV, Miner Rev.)</div>
+    </div>
+    <div class="method-card">
+      <h3>NOTEARS <span class="tag" style="background:rgba(249,115,22,0.15);color:var(--btc)">Optimization</span></h3>
+      <p style="color:var(--text2);font-size:0.85rem">Continuous optimization: learns a weighted adjacency matrix W. Produces sparse DAG directly. Most aggressive filter — fewest edges retained.</p>
+      <div class="formula">min ‖X − XW‖² s.t. tr(e<sup>W∘W</sup>) − d = 0</div>
+      <div class="result">λ₁=0.1 · <span style="color:var(--success)">2 edges</span> (BTC→ETH, BTC→CapMVRV)</div>
+    </div>
+    <div class="method-card">
+      <h3>PCMCI <span class="tag" style="background:rgba(139,92,246,0.15);color:var(--crypto)">Temporal</span></h3>
+      <p style="color:var(--text2);font-size:0.85rem">Partial correlations at each lag, conditioning on all other lagged variables. Separates contemporaneous from lagged effects — captures time structure.</p>
+      <div class="formula">ρ(X<sub>t−τ</sub>, Y<sub>t</sub> | Z) for τ ∈ {0, …, τ<sub>max</sub>}</div>
+      <div class="result">τ_max=4w · <span style="color:var(--success)">26 significant links</span> (most detections)</div>
+    </div>
+    <div class="method-card">
+      <h3>Granger Causality <span class="tag" style="background:rgba(236,72,153,0.15);color:var(--sentiment)">Predictive</span></h3>
+      <p style="color:var(--text2);font-size:0.85rem">F-test on nested VAR models — does X's past improve Y's forecast? Bidirectional testing. Sensitive to lag selection.</p>
+      <div class="formula">F-test: VAR(Y|Y<sub>lag</sub>) vs VAR(Y|Y<sub>lag</sub>,X<sub>lag</sub>)</div>
+      <div class="result">max_lag=8w · <span style="color:var(--macro)">Many bidirectional links</span></div>
+    </div>
+  </div>
+
+  <div class="key-finding" style="margin-top:2rem">
+    Consensus rule: <strong>≥ 2 out of 4 methods</strong> → 10 candidates from 34 tested.<br>
+    Each then undergoes <strong>DoWhy falsification</strong> (placebo, random common cause, data subset).
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 5. DAG -->
+<section id="dag" class="fade-in">
+  <div class="section-label">05 — Validated Results</div>
+  <h2>Final Causal DAG</h2>
+  <p class="subtitle">10 features survived ≥ 2/4 discovery methods + DoWhy refutation tests. Zero Macro variables survived.</p>
+
+  <!-- Consensus Table -->
+  <div class="card" style="overflow-x:auto; margin-bottom:2rem">
+    <h3 style="margin-bottom:1rem">Method Consensus Matrix</h3>
+    <table class="consensus-table">
+      <thead>
+        <tr>
+          <th style="text-align:left">Feature</th>
+          <th>Category</th>
+          <th>PC</th>
+          <th>NOTEARS</th>
+          <th>PCMCI</th>
+          <th>Granger</th>
+          <th>Count</th>
+          <th>DoWhy</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="feature-name">CapMVRV</td><td><span class="pill onchain">On-Chain</span></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="cross">—</td><td><strong>3</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">Miner Revenue</td><td><span class="pill onchain">On-Chain</span></td><td class="check">✓</td><td class="cross">—</td><td class="check">✓</td><td class="check">✓</td><td><strong>3</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">Mining Difficulty</td><td><span class="pill onchain">On-Chain</span></td><td class="cross">—</td><td class="check">✓</td><td class="check">✓</td><td class="cross">—</td><td><strong>2</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">Est. TX Volume</td><td><span class="pill onchain">On-Chain</span></td><td class="cross">—</td><td class="cross">—</td><td class="check">✓</td><td class="check">✓</td><td><strong>2</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">ETH</td><td><span class="pill crypto">Crypto</span></td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="cross">—</td><td><strong>3</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">BNB</td><td><span class="pill crypto">Crypto</span></td><td class="check">✓</td><td class="cross">—</td><td class="check">✓</td><td class="check">✓</td><td><strong>3</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">XRP</td><td><span class="pill crypto">Crypto</span></td><td class="cross">—</td><td class="cross">—</td><td class="check">✓</td><td class="check">✓</td><td><strong>2</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">Stablecoin MCap</td><td><span class="pill sentiment">Sentiment</span></td><td class="cross">—</td><td class="cross">—</td><td class="check">✓</td><td class="check">✓</td><td><strong>2</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">Google "Coinbase"</td><td><span class="pill sentiment">Sentiment</span></td><td class="cross">—</td><td class="cross">—</td><td class="check">✓</td><td class="check">✓</td><td><strong>2</strong></td><td class="check">✓</td></tr>
+        <tr><td class="feature-name">Google "Bitcoin"</td><td><span class="pill sentiment">Sentiment</span></td><td class="cross">—</td><td class="check">✓</td><td class="check">✓</td><td class="cross">—</td><td><strong>2</strong></td><td class="check">✓</td></tr>
+      </tbody>
+    </table>
+    <div style="text-align:center; margin-top:1rem; color:var(--text3); font-size:0.8rem">
+      <strong style="color:var(--danger)">Eliminated:</strong> DXY, VIX, SPX — each detected by only 1/4 methods. Zero Macro variables survived.
+    </div>
+  </div>
+
+  <!-- Visual DAG -->
+  <div class="dag-container">
+    <h3 style="text-align:center;margin-bottom:1.5rem">Validated Causal Structure — 10 Drivers → BTC</h3>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" style="font-family:'DM Sans',sans-serif">
+      <!-- Background zones -->
+      <rect x="30" y="40" width="230" height="300" rx="12" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.2)" stroke-dasharray="4"/>
+      <text x="145" y="30" text-anchor="middle" font-size="11" fill="#10b981" font-weight="700">ON-CHAIN</text>
+      
+      <rect x="280" y="40" width="180" height="300" rx="12" fill="rgba(139,92,246,0.06)" stroke="rgba(139,92,246,0.2)" stroke-dasharray="4"/>
+      <text x="370" y="30" text-anchor="middle" font-size="11" fill="#8b5cf6" font-weight="700">CRYPTO MARKET</text>
+      
+      <rect x="480" y="40" width="230" height="300" rx="12" fill="rgba(236,72,153,0.06)" stroke="rgba(236,72,153,0.2)" stroke-dasharray="4"/>
+      <text x="595" y="30" text-anchor="middle" font-size="11" fill="#ec4899" font-weight="700">SENTIMENT</text>
+
+      <!-- Arrows to BTC (center bottom) -->
+      <!-- BTC node at 400, 380 -->
+      
+      <!-- On-Chain arrows -->
+      <line x1="90" y1="110" x2="380" y2="355" stroke="#10b981" stroke-width="2.5" opacity="0.6" marker-end="url(#arrowG)"/>
+      <line x1="195" y1="110" x2="390" y2="355" stroke="#10b981" stroke-width="3" opacity="0.7" marker-end="url(#arrowG)"/>
+      <line x1="90" y1="220" x2="380" y2="360" stroke="#10b981" stroke-width="2" opacity="0.5" marker-end="url(#arrowG)"/>
+      <line x1="195" y1="220" x2="390" y2="360" stroke="#10b981" stroke-width="2" opacity="0.5" marker-end="url(#arrowG)"/>
+
+      <!-- Crypto arrows -->
+      <line x1="330" y1="110" x2="395" y2="355" stroke="#8b5cf6" stroke-width="3" opacity="0.7" marker-end="url(#arrowP)"/>
+      <line x1="420" y1="110" x2="405" y2="355" stroke="#8b5cf6" stroke-width="3" opacity="0.7" marker-end="url(#arrowP)"/>
+      <line x1="370" y1="220" x2="400" y2="355" stroke="#8b5cf6" stroke-width="2" opacity="0.5" marker-end="url(#arrowP)"/>
+
+      <!-- Sentiment arrows -->
+      <line x1="540" y1="110" x2="410" y2="355" stroke="#ec4899" stroke-width="2" opacity="0.5" marker-end="url(#arrowPk)"/>
+      <line x1="660" y1="110" x2="420" y2="355" stroke="#ec4899" stroke-width="2" opacity="0.5" marker-end="url(#arrowPk)"/>
+      <line x1="600" y1="220" x2="415" y2="355" stroke="#ec4899" stroke-width="2" opacity="0.5" marker-end="url(#arrowPk)"/>
+
+      <!-- Arrow markers -->
+      <defs>
+        <marker id="arrowG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981"/></marker>
+        <marker id="arrowP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8b5cf6"/></marker>
+        <marker id="arrowPk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ec4899"/></marker>
+      </defs>
+
+      <!-- ON-CHAIN NODES -->
+      <rect x="50" y="75" width="80" height="44" rx="8" fill="#065f46" stroke="#10b981" stroke-width="1.5"/>
+      <text x="90" y="95" text-anchor="middle" font-size="10" fill="white" font-weight="700">CapMVRV</text>
+      <text x="90" y="110" text-anchor="middle" font-size="8" fill="#a7f3d0">3 methods</text>
+
+      <rect x="155" y="75" width="80" height="44" rx="8" fill="#065f46" stroke="#10b981" stroke-width="1.5"/>
+      <text x="195" y="92" text-anchor="middle" font-size="9.5" fill="white" font-weight="700">Miner</text>
+      <text x="195" y="104" text-anchor="middle" font-size="9.5" fill="white" font-weight="700">Revenue</text>
+      <text x="195" y="116" text-anchor="middle" font-size="8" fill="#a7f3d0">3 methods</text>
+
+      <rect x="50" y="185" width="80" height="44" rx="8" fill="#065f46" stroke="#10b981" stroke-width="1"/>
+      <text x="90" y="202" text-anchor="middle" font-size="9.5" fill="white" font-weight="600">Mining</text>
+      <text x="90" y="214" text-anchor="middle" font-size="9.5" fill="white" font-weight="600">Difficulty</text>
+      <text x="90" y="226" text-anchor="middle" font-size="8" fill="#a7f3d0">2 methods</text>
+
+      <rect x="155" y="185" width="80" height="44" rx="8" fill="#065f46" stroke="#10b981" stroke-width="1"/>
+      <text x="195" y="205" text-anchor="middle" font-size="9.5" fill="white" font-weight="600">TX Volume</text>
+      <text x="195" y="226" text-anchor="middle" font-size="8" fill="#a7f3d0">2 methods</text>
+
+      <!-- CRYPTO NODES -->
+      <rect x="295" y="75" width="65" height="44" rx="8" fill="#3b0764" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="327" y="100" text-anchor="middle" font-size="11" fill="white" font-weight="700">ETH</text>
+      <text x="327" y="113" text-anchor="middle" font-size="8" fill="#c4b5fd">3 meth.</text>
+
+      <rect x="385" y="75" width="65" height="44" rx="8" fill="#3b0764" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="417" y="100" text-anchor="middle" font-size="11" fill="white" font-weight="700">BNB</text>
+      <text x="417" y="113" text-anchor="middle" font-size="8" fill="#c4b5fd">3 meth.</text>
+
+      <rect x="335" y="195" width="65" height="34" rx="8" fill="#3b0764" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="367" y="215" text-anchor="middle" font-size="11" fill="white" font-weight="600">XRP</text>
+
+      <!-- SENTIMENT NODES -->
+      <rect x="498" y="75" width="85" height="44" rx="8" fill="#831843" stroke="#ec4899" stroke-width="1"/>
+      <text x="540" y="95" text-anchor="middle" font-size="9" fill="white" font-weight="600">Stablecoin</text>
+      <text x="540" y="108" text-anchor="middle" font-size="9" fill="white" font-weight="600">MCap</text>
+
+      <rect x="608" y="75" width="90" height="44" rx="8" fill="#831843" stroke="#ec4899" stroke-width="1"/>
+      <text x="653" y="95" text-anchor="middle" font-size="9" fill="white" font-weight="600">"Coinbase"</text>
+      <text x="653" y="108" text-anchor="middle" font-size="9" fill="white" font-weight="600">search</text>
+
+      <rect x="555" y="195" width="90" height="34" rx="8" fill="#831843" stroke="#ec4899" stroke-width="1"/>
+      <text x="600" y="215" text-anchor="middle" font-size="9" fill="white" font-weight="600">"Bitcoin" search</text>
+
+      <!-- BTC NODE -->
+      <rect x="350" y="355" width="100" height="50" rx="12" fill="#9a3412" stroke="#f97316" stroke-width="2"/>
+      <text x="400" y="378" text-anchor="middle" font-size="13" fill="white" font-weight="700">BTC</text>
+      <text x="400" y="396" text-anchor="middle" font-size="9" fill="#fed7aa">Returns</text>
+
+      <!-- Eliminated box -->
+      <rect x="120" y="280" width="560" height="30" rx="6" fill="rgba(239,68,68,0.08)" stroke="rgba(239,68,68,0.3)" stroke-dasharray="6"/>
+      <text x="400" y="300" text-anchor="middle" font-size="10" fill="#ef4444" font-weight="600">Macro variables (DXY, VIX, SPX, Gold, Oil, M2…) tested but eliminated — detected by only 1/4 methods</text>
+    </svg>
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 6. HORIZON -->
+<section id="horizon" class="fade-in">
+  <div class="section-label">06 — Multi-Horizon Analysis</div>
+  <h2>No Universal Driver</h2>
+  <p class="subtitle">Dominant factor families rotate across investment horizons — single-specification models are misleading.</p>
+
+  <!-- Heatmap -->
+  <div class="card" style="overflow-x:auto">
+    <h3 style="margin-bottom:0.5rem">Clustered MDA Importance by Family</h3>
+    <p style="color:var(--text3);font-size:0.8rem;margin-bottom:1.5rem">Normalized positive Mean Decrease Accuracy (%) from Random Forest per pillar. Source: horizon_analysis.py</p>
+    
+    <div class="heatmap-grid">
+      <div class="heatmap-header"></div>
+      <div class="heatmap-header" style="color:var(--onchain)">On-Chain</div>
+      <div class="heatmap-header" style="color:var(--macro)">Macro</div>
+      <div class="heatmap-header" style="color:var(--sentiment)">Sentiment</div>
+      <div class="heatmap-header" style="color:var(--crypto)">Crypto Mkt</div>
+
+      <div class="heatmap-row-label">T+1</div>
+      <div class="heatmap-cell" style="background:rgba(16,185,129,0.35);color:#a7f3d0"><strong>49.2%</strong></div>
+      <div class="heatmap-cell" style="background:rgba(245,158,11,0.18);color:#fcd34d">27.2%</div>
+      <div class="heatmap-cell" style="background:rgba(236,72,153,0.15);color:#f9a8d4">23.0%</div>
+      <div class="heatmap-cell" style="background:rgba(139,92,246,0.06);color:var(--text3)">0.6%</div>
+
+      <div class="heatmap-row-label">T+7</div>
+      <div class="heatmap-cell" style="background:rgba(16,185,129,0.1);color:#6ee7b7">15.7%</div>
+      <div class="heatmap-cell" style="background:rgba(245,158,11,0.08);color:var(--text3)">10.2%</div>
+      <div class="heatmap-cell" style="background:rgba(236,72,153,0.45);color:#fce7f3"><strong>64.6%</strong></div>
+      <div class="heatmap-cell" style="background:rgba(139,92,246,0.08);color:var(--text3)">9.5%</div>
+
+      <div class="heatmap-row-label">T+30</div>
+      <div class="heatmap-cell" style="background:rgba(16,185,129,0.18);color:#6ee7b7">26.2%</div>
+      <div class="heatmap-cell" style="background:rgba(245,158,11,0.4);color:#fef3c7"><strong>57.3%</strong></div>
+      <div class="heatmap-cell" style="background:rgba(236,72,153,0.05);color:var(--text3)">1.8%</div>
+      <div class="heatmap-cell" style="background:rgba(139,92,246,0.1);color:#c4b5fd">14.7%</div>
+    </div>
+  </div>
+
+  <div class="key-finding">
+    <strong>On-Chain</strong> dominates at T+1 (49.2%) → <strong>Sentiment</strong> peaks at T+7 (64.6%) → <strong>Macro</strong> emerges at T+30 (57.3%)<br>
+    No single pillar dominates universally. Driver rotation is the core finding.
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 7. PREDICTION -->
+<section id="prediction" class="fade-in">
+  <div class="section-label">07 — Predictive Validation</div>
+  <h2>Causal vs. Full Feature Set</h2>
+  <p class="subtitle">A Random Forest classifier (Bear / Neutral / Bull) demonstrates that causal features act as natural regularization.</p>
+
+  <div class="card" style="overflow-x:auto">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Horizon</th>
+          <th>All Variables (138)</th>
+          <th>Best Causal (4–8)</th>
+          <th>Dummy Baseline</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1d</strong></td>
+          <td>33.6%</td>
+          <td>33.8%</td>
+          <td style="color:var(--text3)">33.0%</td>
+        </tr>
+        <tr>
+          <td><strong>7d</strong></td>
+          <td>33.1%</td>
+          <td class="val-high">41.7%</td>
+          <td style="color:var(--text3)">30.3%</td>
+        </tr>
+        <tr>
+          <td><strong>14d</strong></td>
+          <td>34.7%</td>
+          <td class="val-high">42.2%</td>
+          <td style="color:var(--text3)">28.8%</td>
+        </tr>
+        <tr>
+          <td><strong>30d</strong></td>
+          <td>31.9%</td>
+          <td class="val-high">35.4%</td>
+          <td style="color:var(--text3)">22.7%</td>
+        </tr>
+        <tr>
+          <td><strong>60d</strong></td>
+          <td class="val-low">18.1%</td>
+          <td class="val-high">50.2%</td>
+          <td style="color:var(--text3)">12.9%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid-2" style="margin-top:1.5rem">
+    <div class="card">
+      <h3>📉 Why 138 features fail</h3>
+      <p>With ~400 weekly observations, the all-features model suffers from the <strong>curse of dimensionality</strong>: it overfits noise rather than learning signal. At 60d, it degrades to 18.1% — worse than the 12.9% dummy baseline.</p>
+    </div>
+    <div class="card">
+      <h3>📈 Why 4 features win</h3>
+      <p>López de Prado's pipeline acts as <strong>domain-knowledge-driven feature selection</strong>. The 4-feature causal model avoids overfitting, reaching 50.2% balanced accuracy at 60d. At 7d: 66% Bear recall, 54% Bull recall.</p>
+    </div>
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 8. REGIMES -->
+<section id="regimes" class="fade-in">
+  <div class="section-label">08 — Regime Analysis</div>
+  <h2>Macro Regimes as Exposure Filters</h2>
+  <p class="subtitle">Although no Macro variable survived the causal pipeline, macro conditions still condition BTC returns — they're context, not cause.</p>
+
+  <div class="card">
+    <h3 style="margin-bottom:1rem">BTC Forward Returns by Macro Regime (VIX × DXY median split)</h3>
+    <div class="bar-chart">
+      <div class="bar-group">
+        <div class="bar-pair">
+          <div class="bar b14" style="height:18px"><span class="bar-val">0.1%</span></div>
+          <div class="bar b30" style="height:72px"><span class="bar-val">0.5%</span></div>
+        </div>
+        <div class="bar-label">Risk-on<br>Weak $</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-pair">
+          <div class="bar b14" style="height:43px"><span class="bar-val">0.3%</span></div>
+          <div class="bar b30" style="height:72px"><span class="bar-val">0.5%</span></div>
+        </div>
+        <div class="bar-label">Risk-on<br>Strong $</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-pair">
+          <div class="bar b14" style="height:58px"><span class="bar-val">0.4%</span></div>
+          <div class="bar b30" style="height:100px"><span class="bar-val" style="color:var(--btc);font-weight:800">0.7%</span></div>
+        </div>
+        <div class="bar-label">Risk-off<br>Weak $</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-pair">
+          <div class="bar b14" style="height:29px"><span class="bar-val">0.2%</span></div>
+          <div class="bar b30" style="height:100px"><span class="bar-val" style="color:var(--btc);font-weight:800">0.7%</span></div>
+        </div>
+        <div class="bar-label">Risk-off<br>Strong $</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:0.5rem;display:flex;gap:1.5rem;justify-content:center">
+      <span style="font-size:0.8rem;color:var(--text3)"><span style="display:inline-block;width:12px;height:12px;background:var(--accent);border-radius:2px;vertical-align:middle;margin-right:4px"></span> 14d returns</span>
+      <span style="font-size:0.8rem;color:var(--text3)"><span style="display:inline-block;width:12px;height:12px;background:var(--btc);border-radius:2px;vertical-align:middle;margin-right:4px"></span> 30d returns</span>
+    </div>
+  </div>
+
+  <div style="margin-top:1.5rem;color:var(--text2);font-size:0.9rem;max-width:700px">
+    30d returns are consistently higher than 14d across all regimes. Risk-off / weak USD shows the highest returns — contradicting a simple pro-cyclical narrative. This regime framework is designed as an <strong>intermediate step</strong>: as institutional investors enter the crypto market, new causal links to macro variables may emerge.
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 9. FRAMEWORK -->
+<section class="fade-in">
+  <div class="section-label">09 — Decision Framework</div>
+  <h2>Operationalizing Causal Findings</h2>
+  <p class="subtitle">A committee-ready decision process separating regime context from causal drivers.</p>
+
+  <div class="framework-steps">
+    <div class="fw-step">
+      <div class="fw-num">1</div>
+      <div>
+        <strong>Choose Horizon</strong><br>
+        <span style="color:var(--text2);font-size:0.88rem">Driver families rotate across horizons (Fig. 2). Select target investment horizon first.</span>
+      </div>
+    </div>
+    <div class="fw-arrow">▼</div>
+    <div class="fw-step">
+      <div class="fw-num">2</div>
+      <div>
+        <strong>Apply Macro Regime Filter</strong><br>
+        <span style="color:var(--text2);font-size:0.88rem">VIX × DXY classification → context, not cause. Conditions the environment.</span>
+      </div>
+    </div>
+    <div class="fw-arrow">▼</div>
+    <div class="fw-step">
+      <div class="fw-num">3</div>
+      <div>
+        <strong>Monitor Causal Drivers</strong><br>
+        <span style="color:var(--text2);font-size:0.88rem">On-chain + crypto market signals from the validated DAG. Transparent, explainable.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:var(--text3);font-size:0.85rem;margin-top:1rem">
+    <strong>Output:</strong> Transparent, explainable exposure rules compatible with institutional governance.
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 10. CONCLUSIONS -->
+<section id="conclusions" class="fade-in">
+  <div class="section-label">10 — Conclusions</div>
+  <h2>Key Findings</h2>
+
+  <div class="conclusion-item">
+    <span class="marker">▸</span>
+    <div><strong>No universal driver:</strong> Dominant factors rotate across horizons — single-specification models are misleading. On-Chain at T+1, Sentiment at T+7, Macro at T+30.</div>
+  </div>
+  <div class="conclusion-item">
+    <span class="marker" style="color:var(--danger)">▸</span>
+    <div><strong>Macro variables fail falsification:</strong> DXY, VIX, SPX each detected by only 1/4 methods. No Macro feature survives the full pipeline. This likely reflects the dominance of retail investors who don't trade BTC based on macro aggregates.</div>
+  </div>
+  <div class="conclusion-item">
+    <span class="marker" style="color:var(--onchain)">▸</span>
+    <div><strong>On-chain + crypto market dominate:</strong> 7/10 validated drivers are blockchain-native (CapMVRV, mining metrics, altcoins). Bitcoin's price is driven by its own ecosystem.</div>
+  </div>
+  <div class="conclusion-item">
+    <span class="marker" style="color:var(--crypto)">▸</span>
+    <div><strong>Altcoins are causal, not just correlated:</strong> ETH, BNB, XRP survive all 3+ methods and DoWhy refutation — their relationship with BTC passes causal falsification.</div>
+  </div>
+  <div class="conclusion-item">
+    <span class="marker" style="color:var(--success)">▸</span>
+    <div><strong>Causal &gt; full feature set:</strong> 4–8 causal variables outperform 138 features at all horizons beyond 1d. At 60d: 50.2% vs 18.1% balanced accuracy. Natural regularization through domain knowledge.</div>
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- 11. PERSPECTIVES -->
+<section class="fade-in">
+  <div class="section-label">11 — Perspectives</div>
+  <h2>Future Directions</h2>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>🏛️ Institutional Adoption</h3>
+      <p>The current causal structure reflects a retail-dominated market. As institutional players enter (ETFs, sovereign funds), new causal links to macro-financial variables — particularly liquidity proxies (Fed balance sheet, M2) — are likely to emerge, reshaping the DAG.</p>
+    </div>
+    <div class="card">
+      <h3>🔬 Non-Linear Methods</h3>
+      <p>All 4 discovery algorithms assume linearity (Fisher-Z, linear SEM). Threshold effects and regime switches may require non-linear extensions such as kernel-based PCMCI.</p>
+    </div>
+    <div class="card">
+      <h3>⏱️ Temporal Resolution</h3>
+      <p>Weekly resampling was necessary for Google Trends compatibility but loses intra-week dynamics. Daily-frequency causal discovery could reveal short-lived trading signals.</p>
+    </div>
+    <div class="card">
+      <h3>🧪 Out-of-Sample Testing</h3>
+      <p>Validate the regime-aware framework on post-sample data and across other crypto-assets (ETH, SOL). Explore alternative regime definitions (growth × inflation à la Dalio's All Weather).</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p style="margin-bottom:0.5rem">
+    <strong>Pi² Project PA4_25_411</strong> · ESILV 2025–2026 · Group 411
+  </p>
+  <p>
+    Marcel Y. · Nicolas C. · Alvaro S. · Alexandre K. · Hugo N.<br>
+    Supervised by <strong>Mathieu Vaissié</strong> (Ginjer-AM)
+  </p>
+  <p style="margin-top:1rem;font-size:0.75rem;color:var(--text3)">
+    References: López de Prado (2022, 2023) · Pearl (2009) · Spirtes, Glymour & Scheines (2000) · Vaissié (2021)
+  </p>
+</footer>
+
+<script>
+// Scroll-triggered fade-in animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+// Active nav link
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('nav ul li a');
+
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(section => {
+    const sectionTop = section.offsetTop - 100;
+    if (scrollY >= sectionTop) current = section.getAttribute('id');
+  });
+  navLinks.forEach(link => {
+    link.classList.remove('active');
+    if (link.getAttribute('href') === '#' + current) link.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
